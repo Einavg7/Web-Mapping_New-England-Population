@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New England County Mapping</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script src="https://npmcdn.com/@turf/turf/turf.min.js"></script>
+    <style>
+        body {
+            padding: 0;
+            margin: 0;
+        }
+        html, body, #map {
+            height: 100%;
+            width: 100%;
+        }
+		.popup {
+            text-align: center;
+        }
+		.legend {
+			padding: 6px 8px;
+			background-color: rgba(255,255,255,0.8);
+			box-shadow: 0 0 15px rgba(0,0,0,0.2);
+			border-radius: 5px;
+			}
+			
+			.legend i {
+			width: 18px;
+			height: 18px;
+			float: left;
+			margin-right: 8px;
+			opacity: 0.7;
+			}
+			
+			div.legend.leaflet-control br {
+			clear: both;
+			}
+			
+			
+			.description {
+			font-size: 13px;
+			line-height: 18px;
+			color: #333333;
+			font-family: 'Open Sans', Helvetica, sans-serif;
+			padding: 5px 14px;
+			background-color: rgba(245,245,220,0.8) ;
+			box-shadow: 0 0 15px rgba(0,0,0,0.2);
+			border-radius: 5px;
+			max-width: 250px;
+			border: 1px solid grey;
+			}
+
+			.description p {
+			font-size: 14px;
+			line-height: 24px;
+			}
+
+			.description img {
+			max-width: 100px;
+			margin: auto;
+			display: block;
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+
+// Create variable to hold map element, give initial settings to map
+
+var map = L.map("map", {center: [42.407211, -71.382439], zoom: 7});
+
+//chosing a tileLayer
+		var TL = L.tileLayer(
+			"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 
+			{attribution: '&copy; <a href="http://' + 
+			'www.openstreetmap.org/copyright">OpenStreetMap</a>'}
+		).addTo(map);
+		
+ var imagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    	attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+
+// Set color function
+function getColor(d) {
+    if(d == "Least Populated County") return "#4575b4";
+    if(d == "Small Populated County") return "#91bfdb";
+	if(d == "Average Populated County") return "#e0f3f8";
+	if(d == "Large Populated County") return "#fc8d59";
+	if(d == "Most Populated County") return "#d73027";
+}
+
+// Set style function
+
+function setStyle(feature) {
+    return {
+        fillColor: getColor(feature.properties.type),
+        weight: 1,
+        opacity: 1,
+        color: "black",
+        fillOpacity: 0.5
+    };
+}
+
+
+// Add a function to create commas for the number of males and females in the popup
+function formatNumber(num) {
+    return num
+        .toString()
+        .replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
+}
+
+// Add centroid variable
+    var centro = L.layerGroup()
+
+
+//Add Geojson file to map with points style and popups
+
+$.getJSON("county_polygons.geojson", function(data) {
+		geojson = L.geoJSON(data, {style:setStyle, onEachFeature: Base_pop}).addTo(map);
+        turf.featureEach(data, function(currentFeature) {
+        	x = currentFeature;
+    		if (x.geometry != null) {
+    		var centroid = turf.centroid(currentFeature)
+    		L.geoJSON(centroid).addTo(centro)}
+    	});
+		});	
+			
+			
+			
+			function Base_pop(feature, layer) {
+           
+		    layer.bindPopup('<div class="popup">' + 
+		'<b>' + 'Name:' + ' ' + feature.properties.NAME + '</b><br>' +
+		'Total Population:' + ' ' + formatNumber(feature.properties.total_pop) + '<br>' +
+		'Number of Men:' + ' ' + formatNumber(feature.properties.MALES) + '<br>' + 
+		'Number of Women:' + ' ' + formatNumber(feature.properties.FEMALES) +  
+		'</div>'
+		)};
+
+// Create Leaflet Control Object for Legend 
+
+var legend = L.control({position: "topleft"});
+
+legend.onAdd = function(map) {
+    var div = L.DomUtil.create("div", "legend");
+    div.innerHTML = 
+        '<i style="background-color: #4575b4">' + 
+      	'</i>Least Populated County<br>' +
+      	'<i style="background-color: #91bfdb">' + '</i>Small Populated County<br>'+
+      	'<i style="background-color: #e0f3f8">' + '</i>Average Populated County<br>'+
+      	'<i style="background-color: #fc8d59">' + '</i>Large Populated County<br>'+
+      	'<i style="background-color: #d73027">' + '</i>Most Populated County<br>'
+    return div;
+};
+legend.addTo(map);
+
+
+// Create Leaflet Control Object for Description
+
+var description = L.control({position: "bottomright"});
+
+// Function that runs when legend is added to map
+
+description.onAdd = function(map) {
+
+	// Create Div Element and Populate it with HTML
+	
+	var div = L.DomUtil.create("div", "description");		    
+    div.innerHTML = 
+	 '<p><b>Population in New England Counties</b></p><hr>' +
+        '<p>This map shows 26 counties in New England.</p>' +
+        'Each polygon represents a different county. <br>' +
+        'By  clicking the polygons you can get information about the population living in each county: <br><br>' +
+		'<ul>' +
+		'<li>Total Population</li>' +
+        '<li>Number of Men</li>' +
+		'<li>Number of Women</li>' +
+        '</ul>' +
+		'This map has a standard road map and a satellite image map. You can switch between the maps by clicking the menu located below the legend, on the upper left.' + '<br>' + 
+		'<b>In addition, this menu has an option to display the centroid of each polygon by pressing the check box button.<br></b>' +
+		'<hr>' +
+		'The data was collected from Esri data and maps on January 2018<br>' + 
+        'Created with the Leaflet library<br>';
+
+	// Return the Legend div containing the HTML content
+	
+	return div;
+
+};
+
+// Add Legend to Map
+
+description.addTo(map);
+
+// Layer control
+var baseMaps = {
+    "Map": TL,
+	"Imagery": imagery
+};
+var overlayMaps = {
+    "Centroid": centro
+    
+};
+L.control.layers(baseMaps, overlayMaps, {position: "topleft"}).addTo(map);
+
+      </script>
+</body>
+</html>
